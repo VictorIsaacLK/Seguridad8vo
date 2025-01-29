@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
+use App\Http\Controllers\Auth\ActivationController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -39,9 +40,9 @@ Route::middleware('guest')->group(function () {
 // Ruta para cerrar sesión (logout) - Solo si el usuario está autenticado
 Route::post('/logout', [UserController::class, 'logout'])->name('logout')->middleware('auth');
 
-
-
-
+Route::get('/activate-account/{id}', [ActivationController::class, 'activateAccount'])
+    ->name('activate.account')
+    ->middleware('signed'); // La URL debe estar firmada
 
 
 

@@ -9,6 +9,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Notification;
+use App\Notifications\ActivateAccount;
 use App\Models\User;
 
 class UserController extends Controller
@@ -98,9 +100,14 @@ class UserController extends Controller
             'phone_number' => $request->phone_number,
         ]);
 
+
+        // Enviar correo de activación
+        $user->notify(new ActivateAccount($user));
+
+
         return response()->json([
             'status' => 201,
-            'msg' => 'Registro exitoso. Ahora puedes iniciar sesión.'
+            'msg' => 'Registro exitoso. Revisa tu correo para activar tu cuenta.'
         ], 201);
     }
 
@@ -237,9 +244,6 @@ class UserController extends Controller
             'general' => 'Credenciales incorrectas.',
         ]);
     }
-
-
-
 
     /**
      * Cerrar sesión del usuario y revocar su token actual.
