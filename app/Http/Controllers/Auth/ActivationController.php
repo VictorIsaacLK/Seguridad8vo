@@ -8,6 +8,13 @@ use App\Models\User;
 
 class ActivationController extends Controller
 {
+    /**
+     * Activa la cuenta de un usuario.
+     *
+     * @param \Illuminate\Http\Request $request La instancia de la solicitud entrante.
+     * @param int $id El ID del usuario a activar.
+     * @return \Illuminate\Http\RedirectResponse Redirige a la ruta de inicio de sesión con un mensaje de éxito o de cuenta ya activada.
+     */
     public function activateAccount(Request $request, $id)
     {
         $user = User::findOrFail($id);

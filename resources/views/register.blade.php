@@ -250,6 +250,7 @@
             border: 1px solid #ccc;
             border-radius: 5px;
         }
+
         .error {
             color: red;
             font-size: 12px;
@@ -260,6 +261,9 @@
 
     <!-- Script de Google reCAPTCHA -->
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+
 </head>
 
 <body>
@@ -297,6 +301,20 @@
             // Limpiar mensajes de error previos
             document.querySelectorAll('.error').forEach(el => el.textContent = '');
 
+            // Mostrar alerta de carga
+            Swal.fire({
+                title: 'Registrando...',
+                text: 'Por favor espera mientras procesamos tu registro.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            // Deshabilitar botón de registro
+            let registerButton = document.querySelector('button[type="submit"]');
+            registerButton.disabled = true;
+
             let formData = new FormData(this);
             formData.append('g-recaptcha-response', grecaptcha.getResponse());
 
@@ -311,27 +329,52 @@
 
                 let data = await response.json();
 
+                // Si hay errores de validación, los mostramos y cerramos SweetAlert
                 if (!response.ok) {
+                    Swal.close();
+                    registerButton.disabled = false;
+
                     Object.keys(data.errors).forEach(key => {
                         let errorMessage = data.errors[key][0];
-                        if (key === 'name') document.getElementById('nameError').textContent = errorMessage;
-                        if (key === 'last_name') document.getElementById('lastNameError').textContent = errorMessage;
-                        if (key === 'email') document.getElementById('emailError').textContent = errorMessage;
-                        if (key === 'phone_number') document.getElementById('phoneError').textContent = errorMessage;
-                        if (key === 'password') document.getElementById('passwordError').textContent = errorMessage;
-                        if (key === 'g-recaptcha-response') document.getElementById('recaptchaError').textContent = errorMessage;
+                        if (key === 'name') document.getElementById('nameError').textContent =
+                            errorMessage;
+                        if (key === 'last_name') document.getElementById('lastNameError').textContent =
+                            errorMessage;
+                        if (key === 'email') document.getElementById('emailError').textContent =
+                            errorMessage;
+                        if (key === 'phone_number') document.getElementById('phoneError').textContent =
+                            errorMessage;
+                        if (key === 'password') document.getElementById('passwordError').textContent =
+                            errorMessage;
+                        if (key === 'g-recaptcha-response') document.getElementById('recaptchaError')
+                            .textContent = errorMessage;
                     });
+
                     return;
                 }
 
-                alert(data.msg);
-                window.location.href = "{{ route('home') }}";
+                // Si todo está bien, mostrar alerta de éxito
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Registro exitoso',
+                    text: 'Revisa tu correo para activar tu cuenta.',
+                    confirmButtonText: 'OK'
+                }).then(() => {
+                    window.location.href = "{{ route('home') }}";
+                });
 
             } catch (error) {
                 console.error("Error en la solicitud:", error);
-                alert("Error en la conexión con el servidor.");
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error en el servidor',
+                    text: 'Hubo un problema, intenta nuevamente más tarde.'
+                });
+                registerButton.disabled = false;
             }
         });
     </script>
+
 </body>
+
 </html>
