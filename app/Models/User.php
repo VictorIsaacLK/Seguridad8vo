@@ -8,6 +8,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Crypt;
 
 class User extends Authenticatable
 {
@@ -65,9 +66,16 @@ class User extends Authenticatable
      */
     public function generateTwoFactorCode()
     {
+        // Generar el código 2FA de 6 dígitos
+        $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        // Guardar el código cifrado en la base de datos
         $this->forceFill([
-            'two_factor_code' => str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT),
-            'two_factor_expires_at' => Carbon::now()->addMinutes(2)
+            'two_factor_code' => Crypt::encryptString($code),
+            'two_factor_expires_at' => now()->addMinutes(2)
         ])->save();
+
+        // Retornar el código en texto plano
+        return $code;
     }
 }

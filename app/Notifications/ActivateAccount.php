@@ -8,6 +8,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Crypt;
 
 class ActivateAccount extends Notification
 {
@@ -49,10 +50,12 @@ class ActivateAccount extends Notification
      */
     public function toMail($notifiable)
     {
+        $encryptedId = Crypt::encryptString($this->user->id);
+
         $url = URL::temporarySignedRoute(
             'activate.account',
             Carbon::now()->addHours(24), // Expira en 24 horas
-            ['id' => $this->user->id]
+            ['id' => $encryptedId]
         );
 
         return (new MailMessage)

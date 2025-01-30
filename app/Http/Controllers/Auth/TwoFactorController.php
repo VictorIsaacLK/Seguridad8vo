@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Mail;
 use App\Models\User;
 use App\Mail\TwoFactorCodeMail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Crypt;
 
 class TwoFactorController extends Controller
 {
@@ -29,15 +30,15 @@ class TwoFactorController extends Controller
         ]);
 
         // Obtener el ID del usuario desde la sesión
-        $userId = session('two_factor_user_id');
-        $user = User::find($userId);
+        $userId = Crypt::decryptString(session('two_factor_user_id'));
+        $user = User::findOrFail($userId);
 
         if (!$user) {
             return back()->withErrors(['two_factor_code' => 'Usuario no encontrado. Intente iniciar sesión nuevamente.']);
         }
-
+        $decryptedCode = Crypt::decryptString($user->two_factor_code);
         // Verificar si el código es correcto y no ha expirado
-        if ($user->two_factor_code === $request->two_factor_code) {
+        if ($decryptedCode === $request->two_factor_code) {
             if (Carbon::now()->gt($user->two_factor_expires_at)) {
                 return back()->withErrors(['two_factor_code' => 'El código ha expirado. Intenta nuevamente.']);
             }
@@ -61,8 +62,8 @@ class TwoFactorController extends Controller
     public function resendCode()
     {
         // Obtener el ID del usuario desde la sesión
-        $userId = session('two_factor_user_id');
-        $user = User::find($userId);
+        $userId = Crypt::decryptString(session('two_factor_user_id'));
+        $user = User::findOrFail($userId);
 
         if (!$user) {
             return response()->json([
@@ -72,11 +73,11 @@ class TwoFactorController extends Controller
         }
 
         // Generar un nuevo código 2FA
-        $user->generateTwoFactorCode();
+        $twoFactorCode = $user->generateTwoFactorCode();
 
         // Enviar el código en segundo plano
         try {
-            Mail::to($user->email)->send(new TwoFactorCodeMail($user->two_factor_code));
+            Mail::to($user->email)->send(new TwoFactorCodeMail($twoFactorCode));
         } catch (\Exception $e) {
             Log::error('Error al enviar correo 2FA: ' . $e->getMessage());
         }

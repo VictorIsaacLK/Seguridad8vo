@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
@@ -20,30 +21,6 @@ use App\Models\User;
 
 class UserController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function index()
-    {
-        // Obtener todos los usuarios
-        $users = User::with('role')->get();
-        return response()->json($users);
-        // return response()->json(['message' => 'Listado de usuarios no disponible todavia'], 405);
-    }
-
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
-    {
-        //  Temporal en lo que se crea la interacion por medio de Blade
-        return response()->json(['message' => 'Formulario de creación no disponible toadavia'], 405);
-    }
-
     /**
      * Store a newly created user in storage.
      *
@@ -101,7 +78,7 @@ class UserController extends Controller
             'name' => $request->name,
             'last_name' => $request->last_name,
             'email' => $request->email,
-            'password' => bcrypt($request->password), // Cifrar contraseña
+            'password' => bcrypt($request->password),
             'phone_number' => $request->phone_number,
         ]);
 
@@ -109,102 +86,12 @@ class UserController extends Controller
         // Enviar correo de activación
         $user->notify(new ActivateAccount($user));
 
-
         return response()->json([
             'status' => 201,
             'msg' => 'Registro exitoso. Revisa tu correo para activar tu cuenta.'
         ], 201);
     }
 
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id)
-    {
-        // Obtener un usuario por ID
-        $user = User::with('role')->find($id);
-
-        if (!$user) {
-            return response()->json(['error' => 'Usuario no encontrado'], 404);
-        }
-
-        return response()->json($user);
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function edit($id)
-    {
-        // Aun no disponible
-        return response()->json(['message' => 'Formulario de edición no disponible'], 405);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, $id)
-    {
-        // Validar los datos
-        $validatedData = $request->validate([
-            'name' => 'required|string|max:50',
-            'last_name' => 'required|string|max:50',
-            'email' => 'required|string|email|max:50|unique:users,email,' . $id,
-            'password' => 'nullable|string|min:8|max:14|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/',
-            'phone_number' => 'required|regex:/^[0-9]{10}$/',
-        ]);
-
-        // Buscar el usuario por ID
-        $user = User::find($id);
-
-        if (!$user) {
-            return response()->json(['error' => 'Usuario no encontrado'], 404);
-        }
-
-        // Actualizar los datos del usuario
-        $user->update(array_filter([
-            'name' => $validatedData['name'] ?? null,
-            'last_name' => $validatedData['last_name'] ?? null,
-            'email' => $validatedData['email'] ?? null,
-            'password' => isset($validatedData['password']) ? bcrypt($validatedData['password']) : null,
-            'phone_number' => $validatedData['phone_number'] ?? null,
-        ]));
-
-        return response()->json($user);
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function destroy($id)
-    {
-        // Buscar el usuario por ID
-        $user = User::find($id);
-
-        if (!$user) {
-            return response()->json(['error' => 'Usuario no encontrado'], 404);
-        }
-
-        // Cambiar el campo status a 0
-        $user->status = 0;
-        $user->save();
-
-        return response()->json(['message' => 'El usuario ha sido desactivado (status cambiado a 0)']);
-    }
 
     /**
      * Iniciar sesión y obtener un token de autenticación.
@@ -241,7 +128,7 @@ class UserController extends Controller
         if (!$recaptchaData['success']) {
             return response()->json([
                 'status' => 'error',
-                'errors' => ['general' => 'Por favor, completa el reCAPTCHA correctamente.']
+                'errors' => ['ge' => 'Por favor, completa el reCAPTCHA correctamente.']
             ], 400);
         }
 
@@ -263,16 +150,16 @@ class UserController extends Controller
             ], 403);
         }
 
-        // Generar código 2FA
-        $user->generateTwoFactorCode();
+        // Generar código 2FA y obtenerlo en texto plano
+        $twoFactorCode = $user->generateTwoFactorCode();
 
-        // Guardar el ID en sesión (sin autenticar aún)
-        session(['two_factor_user_id' => $user->id]);
+        // Guardar el ID en sesión (cifrado)
+        session(['two_factor_user_id' => Crypt::encryptString($user->id)]);
 
         // Enviar código en segundo plano
-        dispatch(function () use ($user) {
+        dispatch(function () use ($user, $twoFactorCode) {
             try {
-                Mail::to($user->email)->send(new TwoFactorCodeMail($user->two_factor_code));
+                Mail::to($user->email)->send(new TwoFactorCodeMail($twoFactorCode));
             } catch (\Exception $e) {
                 Log::error('Error al enviar correo 2FA: ' . $e->getMessage());
             }
@@ -284,9 +171,6 @@ class UserController extends Controller
             'redirect' => route('verify.code')
         ], 200);
     }
-
-
-
     /**
      * Cerrar sesión del usuario y revocar su token actual.
      *
