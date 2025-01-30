@@ -43,13 +43,14 @@ Route::post('/logout', [UserController::class, 'logout'])->name('logout')->middl
 
 Route::get('/activate-account/{id}', [ActivationController::class, 'activateAccount'])
     ->name('activate.account')
-    ->middleware('signed'); // La URL debe estar firmada
+    ->middleware('signed'); // La url firmada
 
 
 
 
 Route::get('/verify-code', [TwoFactorController::class, 'showVerifyForm'])->name('verify.code');
 Route::post('/verify-code', [TwoFactorController::class, 'verifyCode'])->name('verify.code.submit');
+Route::post('/resend-code', [TwoFactorController::class, 'resendCode'])->name('resend.code');
 
 
 

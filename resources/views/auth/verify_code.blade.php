@@ -26,7 +26,20 @@
             color: red;
             margin: 10px 0;
         }
+        .resend-btn {
+            margin-top: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .resend-btn:hover {
+            background-color: #0056b3;
+        }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
     <div class="container">
@@ -43,11 +56,49 @@
             <button type="submit">Verificar</button>
         </form>
 
+        <button class="resend-btn" id="resendCode">Reenviar Código</button>
+
         @if ($errors->any())
             @foreach ($errors->all() as $error)
                 <p class="error">{{ $error }}</p>
             @endforeach
         @endif
     </div>
+
+    <script>
+        document.getElementById("resendCode").addEventListener("click", function() {
+            Swal.fire({
+                title: "Reenviando código...",
+                text: "Por favor espera mientras generamos un nuevo código.",
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            fetch("{{ route('resend.code') }}", {
+                method: "POST",
+                headers: {
+                    "X-CSRF-TOKEN": document.querySelector('input[name="_token"]').value,
+                    "Content-Type": "application/json"
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                Swal.fire({
+                    icon: data.status === "success" ? "success" : "error",
+                    title: data.status === "success" ? "Código reenviado" : "Error",
+                    text: data.message
+                });
+            })
+            .catch(error => {
+                Swal.fire({
+                    icon: "error",
+                    title: "Error en el servidor",
+                    text: "Hubo un problema al reenviar el código. Inténtalo más tarde."
+                });
+            });
+        });
+    </script>
 </body>
 </html>

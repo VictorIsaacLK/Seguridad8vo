@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use App\Models\User;
+use App\Mail\TwoFactorCodeMail;
+use Illuminate\Support\Facades\Log;
 
 class TwoFactorController extends Controller
 {
@@ -45,7 +48,7 @@ class TwoFactorController extends Controller
                 'two_factor_expires_at' => null
             ]);
 
-            // Iniciar sesión del usuario y eliminar la sesión temporal del 2FA
+            // autenticamos al usuario
             Auth::login($user);
             session()->forget('two_factor_user_id');
 
@@ -53,5 +56,34 @@ class TwoFactorController extends Controller
         }
 
         return back()->withErrors(['two_factor_code' => 'El código ingresado es incorrecto.']);
+    }
+
+    public function resendCode()
+    {
+        // Obtener el ID del usuario desde la sesión
+        $userId = session('two_factor_user_id');
+        $user = User::find($userId);
+
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Usuario no encontrado. Intenta iniciar sesión nuevamente.'
+            ], 400);
+        }
+
+        // Generar un nuevo código 2FA
+        $user->generateTwoFactorCode();
+
+        // Enviar el código en segundo plano
+        try {
+            Mail::to($user->email)->send(new TwoFactorCodeMail($user->two_factor_code));
+        } catch (\Exception $e) {
+            Log::error('Error al enviar correo 2FA: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Se ha enviado un nuevo código a tu correo.'
+        ]);
     }
 }

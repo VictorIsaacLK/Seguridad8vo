@@ -10,8 +10,10 @@ use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\RateLimiter;
 use Carbon\Carbon;
 use App\Notifications\ActivateAccount;
 use App\Models\User;
@@ -212,14 +214,21 @@ class UserController extends Controller
      */
     public function login(Request $request)
     {
-        // Validar los datos del formulario
-        $credentials = $request->validate([
+        // Validación de los datos
+        $validator = Validator::make($request->all(), [
             'email' => 'required|email|max:50',
             'password' => 'required|string|min:8|max:14|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/',
             'g-recaptcha-response' => 'required'
         ], [
             'g-recaptcha-response.required' => 'Por favor, completa el reCAPTCHA.',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => ['general' => 'Los datos ingresados son incorrectos.']
+            ], 400);
+        }
 
         // Verificar reCAPTCHA con Google
         $recaptchaResponse = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
@@ -230,27 +239,52 @@ class UserController extends Controller
         $recaptchaData = $recaptchaResponse->json();
 
         if (!$recaptchaData['success']) {
-            return back()->withErrors(['g-recaptcha-response' => 'Por favor, completa el reCAPTCHA correctamente.'])->withInput();
+            return response()->json([
+                'status' => 'error',
+                'errors' => ['general' => 'Por favor, completa el reCAPTCHA correctamente.']
+            ], 400);
         }
 
-        // Intentar autenticar al usuario
+        // Buscar usuario
         $user = User::where('email', $request->email)->first();
 
-        if ($user && Auth::attempt($request->only('email', 'password'))) {
-            // Generar y guardar el código de autenticación de dos factores
-            $user->generateTwoFactorCode();
-
-            // Guardar el ID del usuario en la sesión
-            session(['two_factor_user_id' => $user->id]);
-
-            // Enviar el código por correo
-            Mail::to($user->email)->send(new TwoFactorCodeMail($user->two_factor_code));
-
-            return redirect()->route('verify.code')->with('message', 'Se ha enviado un código a tu correo.');
+        if (!$user || !Hash::check($request->password, $user->password)) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => ['general' => 'Credenciales incorrectas.']
+            ], 400);
         }
 
-        return back()->withErrors(['general' => 'Credenciales incorrectas.']);
+        // Verificar si el usuario está activo (status == 1)
+        if ($user->status !== 1) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => ['general' => 'Debes activar tu cuenta antes de iniciar sesión.']
+            ], 403);
+        }
+
+        // Generar código 2FA
+        $user->generateTwoFactorCode();
+
+        // Guardar el ID en sesión (sin autenticar aún)
+        session(['two_factor_user_id' => $user->id]);
+
+        // Enviar código en segundo plano
+        dispatch(function () use ($user) {
+            try {
+                Mail::to($user->email)->send(new TwoFactorCodeMail($user->two_factor_code));
+            } catch (\Exception $e) {
+                Log::error('Error al enviar correo 2FA: ' . $e->getMessage());
+            }
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Se ha enviado un código a tu correo.',
+            'redirect' => route('verify.code')
+        ], 200);
     }
+
 
 
     /**

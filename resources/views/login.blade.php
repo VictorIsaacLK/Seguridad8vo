@@ -70,6 +70,20 @@
             justify-content: space-between;
         }
 
+        .error {
+            color: red;
+            font-size: 12px;
+            text-align: left;
+            margin-top: -5px;
+            margin-bottom: 10px;
+        }
+
+        .link-container {
+            margin-top: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+
         .disabled-link {
             color: gray;
             pointer-events: none;
@@ -93,37 +107,27 @@
         .btn-back:hover {
             background: #d32f2f;
         }
-
-        .error-message {
-            color: red;
-            margin-bottom: 10px;
-        }
     </style>
 
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 
 <body>
     <div class="container">
         <h1>Iniciar Sesión</h1>
 
-        <!-- Mostrar mensajes de error -->
-        @if ($errors->any())
-            <div class="error-message">
-                @foreach ($errors->all() as $error)
-                    <p>{{ $error }}</p>
-                @endforeach
-            </div>
-        @endif
-
-
-        <form action="{{ route('login.submit') }}" method="POST">
+        <form id="loginForm">
             @csrf
-            <input type="email" name="email" placeholder="Email" required />
-            <input type="password" name="password" placeholder="Contraseña" required />
+            <input type="email" name="email" placeholder="Email" required>
+            <span class="error" id="emailError"></span>
+
+            <input type="password" name="password" placeholder="Contraseña" required>
+            <span class="error" id="passwordError"></span>
 
             <!-- reCAPTCHA -->
             <div class="g-recaptcha" data-sitekey="{{ env('RECAPTCHA_SITE_KEY') }}"></div>
+            <span class="error" id="recaptchaError"></span>
 
             <button type="submit" class="btn-login">Iniciar sesión</button>
 
@@ -133,8 +137,83 @@
             </div>
 
             <button class="btn-back" onclick="window.location.href='{{ url('/') }}'">Regresar</button>
+
         </form>
     </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            // Limpiar mensajes de error previos
+            document.querySelectorAll('.error').forEach(el => el.textContent = '');
+
+            // Mostrar alerta de carga
+            Swal.fire({
+                title: 'Iniciando sesión...',
+                text: 'Por favor espera mientras verificamos tu información.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            // Deshabilitar botón de login
+            let loginButton = document.querySelector('button[type="submit"]');
+            loginButton.disabled = true;
+
+            let formData = new FormData(this);
+            formData.append('g-recaptcha-response', grecaptcha.getResponse());
+
+            try {
+                let response = await fetch("{{ route('login.submit') }}", {
+                    method: "POST",
+                    headers: {
+                        "X-CSRF-TOKEN": document.querySelector('input[name="_token"]').value
+                    },
+                    body: formData
+                });
+
+                let data = await response.json();
+
+                if (!response.ok) {
+                    Swal.close();
+                    loginButton.disabled = false;
+
+                    // Si hay errores, mostrar mensaje genérico
+                    if (data.errors.general) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: data.errors.general
+                        });
+                    }
+
+                    return;
+                }
+
+                // Si el login es correcto, mostrar alerta de éxito
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Código enviado',
+                    text: 'Revisa tu correo para ingresar el código de verificación.',
+                    confirmButtonText: 'OK'
+                }).then(() => {
+                    window.location.href = "{{ route('verify.code') }}";
+                });
+
+            } catch (error) {
+                console.error("Error en la solicitud:", error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error en el servidor',
+                    text: 'Hubo un problema, intenta nuevamente más tarde.'
+                });
+                loginButton.disabled = false;
+            }
+        });
+    </script>
+
 </body>
 
 </html>

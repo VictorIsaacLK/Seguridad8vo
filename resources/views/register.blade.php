@@ -256,7 +256,17 @@
             font-size: 12px;
             text-align: left;
         }
-    </style>
+
+        .btn-back:hover {
+            background: #d32f2f;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-top: 10px;
+        }
     </style>
 
     <!-- Script de Google reCAPTCHA -->
@@ -284,13 +294,21 @@
             <span class="error" id="phoneError"></span>
 
             <input type="password" name="password" placeholder="Contraseña" required>
+
             <span class="error" id="passwordError"></span>
+            <small style="color: gray; font-size: 12px;">Debe tener entre 8 y 14 caracteres, incluir una mayúscula, una
+                minúscula y un número.</small>
+
+            <br>
 
             <!-- reCAPTCHA -->
             <div class="g-recaptcha" data-sitekey="{{ env('RECAPTCHA_SITE_KEY') }}"></div>
             <span class="error" id="recaptchaError"></span>
 
-            <button type="submit">Registrarse</button>
+            <div class="button-container">
+                <button type="submit">Registrarse</button>
+                <button class="btn-back" onclick="window.location.href='{{ url('/') }}'">Regresar</button>
+            </div>
         </form>
     </div>
 
