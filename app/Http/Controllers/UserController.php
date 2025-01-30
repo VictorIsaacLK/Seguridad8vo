@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\TwoFactorCodeMail;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
+use Carbon\Carbon;
 use App\Notifications\ActivateAccount;
 use App\Models\User;
 
@@ -209,13 +212,13 @@ class UserController extends Controller
      */
     public function login(Request $request)
     {
-        // Validación de los campos
+        // Validar los datos del formulario
         $credentials = $request->validate([
             'email' => 'required|email|max:50',
             'password' => 'required|string|min:8|max:14|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/',
-            'g-recaptcha-response' => 'required' // Asegura que el reCAPTCHA esté presente
+            'g-recaptcha-response' => 'required'
         ], [
-            'g-recaptcha-response.required' => 'Por favor, completa el reCAPTCHA.', // Mensaje específico para reCAPTCHA
+            'g-recaptcha-response.required' => 'Por favor, completa el reCAPTCHA.',
         ]);
 
         // Verificar reCAPTCHA con Google
@@ -226,24 +229,29 @@ class UserController extends Controller
 
         $recaptchaData = $recaptchaResponse->json();
 
-
         if (!$recaptchaData['success']) {
             return back()->withErrors(['g-recaptcha-response' => 'Por favor, completa el reCAPTCHA correctamente.'])->withInput();
         }
 
-        // Si reCAPTCHA es válido, continuar con la autenticación
-        $userCredentials = $request->only('email', 'password'); // Solo usar email y password
+        // Intentar autenticar al usuario
+        $user = User::where('email', $request->email)->first();
 
-        if (Auth::guard('web')->attempt($userCredentials)) {
-            $request->session()->regenerate(); // Regenerar la sesión
-            return redirect()->route('home')->with('success', 'Inicio de sesión exitoso.');
+        if ($user && Auth::attempt($request->only('email', 'password'))) {
+            // Generar y guardar el código de autenticación de dos factores
+            $user->generateTwoFactorCode();
+
+            // Guardar el ID del usuario en la sesión
+            session(['two_factor_user_id' => $user->id]);
+
+            // Enviar el código por correo
+            Mail::to($user->email)->send(new TwoFactorCodeMail($user->two_factor_code));
+
+            return redirect()->route('verify.code')->with('message', 'Se ha enviado un código a tu correo.');
         }
 
-        // Mensaje genérico para credenciales incorrectas
-        return back()->withErrors([
-            'general' => 'Credenciales incorrectas.',
-        ]);
+        return back()->withErrors(['general' => 'Credenciales incorrectas.']);
     }
+
 
     /**
      * Cerrar sesión del usuario y revocar su token actual.

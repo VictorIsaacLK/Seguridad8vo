@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\UserController;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Auth\ActivationController;
+use App\Http\Controllers\Auth\TwoFactorController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -47,6 +48,8 @@ Route::get('/activate-account/{id}', [ActivationController::class, 'activateAcco
 
 
 
+Route::get('/verify-code', [TwoFactorController::class, 'showVerifyForm'])->name('verify.code');
+Route::post('/verify-code', [TwoFactorController::class, 'verifyCode'])->name('verify.code.submit');
 
 
 
