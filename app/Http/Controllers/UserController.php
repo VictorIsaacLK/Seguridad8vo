@@ -29,6 +29,24 @@ class UserController extends Controller
      */
     public function store(Request $request)
     {
+        // Definir claves para limitar por IP y email
+        $keyIp = 'register-ip:' . $request->ip();
+        $keyEmail = 'register-email:' . $request->email;
+
+        // Verificar si se alcanzó el límite de intentos
+        if (RateLimiter::tooManyAttempts($keyIp, 5)) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => ['general' => 'Demasiadas solicitudes desde esta IP. Intenta de nuevo en ' . RateLimiter::availableIn($keyIp) . ' segundos.']
+            ], 429);
+        }
+        if (RateLimiter::tooManyAttempts($keyEmail, 3)) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => ['general' => 'Demasiados intentos con este correo. Intenta de nuevo en ' . RateLimiter::availableIn($keyEmail) . ' segundos.']
+            ], 429);
+        }
+
         // Validar datos y reCAPTCHA
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:50|min:4|',
@@ -51,6 +69,8 @@ class UserController extends Controller
 
         // Si la validación falla, devolver JSON
         if ($validator->fails()) {
+            RateLimiter::hit($keyIp, 60); // Bloquear IP por 1 minuto si falla
+            RateLimiter::hit($keyEmail, 60); // Mismo con correo
             return response()->json([
                 'status' => 400,
                 'errors' => $validator->errors()
@@ -86,6 +106,10 @@ class UserController extends Controller
         // Enviar correo de activación
         $user->notify(new ActivateAccount($user));
 
+        // Limpiar intentos fallidos tras un registro exitoso
+        RateLimiter::clear($keyIp);
+        RateLimiter::clear($keyEmail);
+
         return response()->json([
             'status' => 201,
             'msg' => 'Registro exitoso. Revisa tu correo para activar tu cuenta.'
@@ -101,6 +125,25 @@ class UserController extends Controller
      */
     public function login(Request $request)
     {
+        // Definir llaves para limitar por IP y por email
+        $keyIp = 'login-ip:' . $request->ip();
+        $keyEmail = 'login-email:' . $request->email;
+
+        // Si se alcanzó el límite, devolver error
+        if (RateLimiter::tooManyAttempts($keyIp, 5)) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => ['general' => 'Demasiados intentos. Intenta de nuevo en ' . RateLimiter::availableIn($keyIp) . ' segundos.']
+            ], 429);
+        }
+
+        if (RateLimiter::tooManyAttempts($keyEmail, 3)) {
+            return response()->json([
+                'status' => 'error',
+                'errors' => ['general' => 'Demasiados intentos con este correo. Intenta de nuevo en ' . RateLimiter::availableIn($keyEmail) . ' segundos.']
+            ], 429);
+        }
+
         // Validación de los datos
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|max:50',
@@ -136,6 +179,10 @@ class UserController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
+            // Aumentar contador de intentos fallidos
+            RateLimiter::hit($keyIp, 60);
+            RateLimiter::hit($keyEmail, 60);
+
             return response()->json([
                 'status' => 'error',
                 'errors' => ['general' => 'Credenciales incorrectas.']
@@ -155,6 +202,10 @@ class UserController extends Controller
 
         // Guardar el ID en sesión (cifrado)
         session(['two_factor_user_id' => Crypt::encryptString($user->id)]);
+
+        // Limpiar intentos fallidos ya que ya se autentifico
+        RateLimiter::clear($keyIp);
+        RateLimiter::clear($keyEmail);
 
         // Enviar código en segundo plano
         dispatch(function () use ($user, $twoFactorCode) {
@@ -182,7 +233,7 @@ class UserController extends Controller
         Auth::guard('web')->logout(); // Cerrar sesión correctamente con el guard web
 
         $request->session()->invalidate(); // Invalidar la sesión
-        $request->session()->regenerateToken(); // Regenerar el token CSRF
+        $request->session()->regenerateToken(); // Regenerar el token csrf
 
         return redirect()->route('home'); // Redirigir a la página principal
     }

@@ -352,21 +352,29 @@
                     Swal.close();
                     registerButton.disabled = false;
 
-                    Object.keys(data.errors).forEach(key => {
-                        let errorMessage = data.errors[key][0];
-                        if (key === 'name') document.getElementById('nameError').textContent =
-                            errorMessage;
-                        if (key === 'last_name') document.getElementById('lastNameError').textContent =
-                            errorMessage;
-                        if (key === 'email') document.getElementById('emailError').textContent =
-                            errorMessage;
-                        if (key === 'phone_number') document.getElementById('phoneError').textContent =
-                            errorMessage;
-                        if (key === 'password') document.getElementById('passwordError').textContent =
-                            errorMessage;
-                        if (key === 'g-recaptcha-response') document.getElementById('recaptchaError')
-                            .textContent = errorMessage;
-                    });
+                    if (response.status === 429) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Demasiadas solicitudes',
+                            text: data.errors.general
+                        });
+                    } else {
+                        Object.keys(data.errors).forEach(key => {
+                            let errorMessage = data.errors[key][0];
+                            if (key === 'name') document.getElementById('nameError').textContent =
+                                errorMessage;
+                            if (key === 'last_name') document.getElementById('lastNameError')
+                                .textContent = errorMessage;
+                            if (key === 'email') document.getElementById('emailError').textContent =
+                                errorMessage;
+                            if (key === 'phone_number') document.getElementById('phoneError')
+                                .textContent = errorMessage;
+                            if (key === 'password') document.getElementById('passwordError')
+                                .textContent = errorMessage;
+                            if (key === 'g-recaptcha-response') document.getElementById(
+                                'recaptchaError').textContent = errorMessage;
+                        });
+                    }
 
                     return;
                 }

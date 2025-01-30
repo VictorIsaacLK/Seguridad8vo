@@ -179,16 +179,21 @@
                 if (!response.ok) {
                     Swal.close();
                     loginButton.disabled = false;
-
-                    // Si hay errores, mostrar mensaje genérico
                     if (data.errors.general) {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Error',
-                            text: data.errors.general
-                        });
+                        if (response.status === 429) {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Demasiadas solicitudes',
+                                text: data.errors.general
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: data.errors.general
+                            });
+                        }
                     }
-
                     return;
                 }
 
