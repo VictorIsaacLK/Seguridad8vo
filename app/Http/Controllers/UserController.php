@@ -22,18 +22,18 @@ use App\Models\User;
 class UserController extends Controller
 {
     /**
-     * Store a newly created user in storage.
+     * Registra un nuevo usuario en el sistema
      *
-     * @param  \Illuminate\Http\Request  $request  The request containing user details
-     *  A JSON response with the created user or validation errors
+     * @param  \Illuminate\Http\Request  $request  Datos del usuario a registrar
+     * @return \Illuminate\Http\JsonResponse  Respuesta json con el resultado del registro
      */
     public function store(Request $request)
     {
-        // Definir claves para limitar por IP y email
+        // Definir claves para limitar numero de intentos por IP y email
         $keyIp = 'register-ip:' . $request->ip();
         $keyEmail = 'register-email:' . $request->email;
 
-        // Verificar si se alcanzó el límite de intentos
+        // Verificar si se alcanzo el limite de intentos (correo e IP)
         if (RateLimiter::tooManyAttempts($keyIp, 5)) {
             return response()->json([
                 'status' => 'error',
@@ -47,7 +47,7 @@ class UserController extends Controller
             ], 429);
         }
 
-        // Validar datos y reCAPTCHA
+        // Validar datos y recaptcha
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:50|min:4|',
             'last_name' => 'required|string|max:50|min:4|',
@@ -67,7 +67,7 @@ class UserController extends Controller
             'g-recaptcha-response.required' => 'Debes completar el reCAPTCHA para registrarte.',
         ]);
 
-        // Si la validación falla, devolver JSON
+        // Si la validacion falla, devolver JSON
         if ($validator->fails()) {
             RateLimiter::hit($keyIp, 60); // Bloquear IP por 1 minuto si falla
             RateLimiter::hit($keyEmail, 60); // Mismo con correo
@@ -77,7 +77,7 @@ class UserController extends Controller
             ], 400);
         }
 
-        // Verificar reCAPTCHA con Google
+        // Verificar rechaptcha con Google (Prevenir bots)
         $response = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
             'secret' => env('RECAPTCHA_SECRET_KEY'),
             'response' => $request->input('g-recaptcha-response'),
@@ -93,7 +93,7 @@ class UserController extends Controller
             ], 400);
         }
 
-        // Crear usuario si el reCAPTCHA es válido
+        // Crear usuario si lo anterior fue exitoso
         $user = User::create([
             'name' => $request->name,
             'last_name' => $request->last_name,
@@ -103,7 +103,7 @@ class UserController extends Controller
         ]);
 
 
-        // Enviar correo de activación
+        // Enviar correo de activacion
         $user->notify(new ActivateAccount($user));
 
         // Limpiar intentos fallidos tras un registro exitoso
@@ -115,13 +115,16 @@ class UserController extends Controller
             'msg' => 'Registro exitoso. Revisa tu correo para activar tu cuenta.'
         ], 201);
     }
-
-
     /**
-     * Iniciar sesión y obtener un token de autenticación.
+     * Iniciar sesion y generar un codigo 2FA
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\RedirectResponse
+     * Esta funcion autentica a un usuario mediante su correo y contraseña,
+     * valida el recaptcha (bots) y envia un código 2FA al correo
+     * Limitación de intentos de inicio de sesión por IP y por correo
+     * para ataques de fuerza bruta
+     *
+     * @param  \Illuminate\Http\Request  $request  Datos de inicio de sesion
+     * @return \Illuminate\Http\JsonResponse  Respuesta json con el resultado del inicio
      */
     public function login(Request $request)
     {
@@ -129,14 +132,13 @@ class UserController extends Controller
         $keyIp = 'login-ip:' . $request->ip();
         $keyEmail = 'login-email:' . $request->email;
 
-        // Si se alcanzó el límite, devolver error
+        // Si se alcanzó el limite, devolver error
         if (RateLimiter::tooManyAttempts($keyIp, 5)) {
             return response()->json([
                 'status' => 'error',
                 'errors' => ['general' => 'Demasiados intentos. Intenta de nuevo en ' . RateLimiter::availableIn($keyIp) . ' segundos.']
             ], 429);
         }
-
         if (RateLimiter::tooManyAttempts($keyEmail, 3)) {
             return response()->json([
                 'status' => 'error',
@@ -144,7 +146,7 @@ class UserController extends Controller
             ], 429);
         }
 
-        // Validación de los datos
+        // Validacion de los datos
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|max:50',
             'password' => 'required|string|min:8|max:14|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/',
@@ -160,7 +162,7 @@ class UserController extends Controller
             ], 400);
         }
 
-        // Verificar reCAPTCHA con Google
+        // Verificar recaptcha con Google
         $recaptchaResponse = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
             'secret' => env('RECAPTCHA_SECRET_KEY'),
             'response' => $request->input('g-recaptcha-response')
@@ -178,6 +180,7 @@ class UserController extends Controller
         // Buscar usuario
         $user = User::where('email', $request->email)->first();
 
+        // Credenciales verificacion
         if (!$user || !Hash::check($request->password, $user->password)) {
             // Aumentar contador de intentos fallidos
             RateLimiter::hit($keyIp, 60);
@@ -189,7 +192,7 @@ class UserController extends Controller
             ], 400);
         }
 
-        // Verificar si el usuario está activo (status == 1)
+        // Verificar si el usuario esta activo (status == 1)
         if ($user->status !== 1) {
             return response()->json([
                 'status' => 'error',
@@ -197,7 +200,7 @@ class UserController extends Controller
             ], 403);
         }
 
-        // Generar código 2FA y obtenerlo en texto plano
+        // Generar codigo 2FA y obtenerlo en texto plano (no codificado)
         $twoFactorCode = $user->generateTwoFactorCode();
 
         // Guardar el ID en sesión (cifrado)
@@ -207,7 +210,7 @@ class UserController extends Controller
         RateLimiter::clear($keyIp);
         RateLimiter::clear($keyEmail);
 
-        // Enviar código en segundo plano
+        // Enviar codigo en segundo plano
         dispatch(function () use ($user, $twoFactorCode) {
             try {
                 Mail::to($user->email)->send(new TwoFactorCodeMail($twoFactorCode));
@@ -216,6 +219,7 @@ class UserController extends Controller
             }
         });
 
+        // Responder con éxito y redireccionar al siguiente paso
         return response()->json([
             'status' => 'success',
             'message' => 'Se ha enviado un código a tu correo.',
@@ -225,16 +229,16 @@ class UserController extends Controller
     /**
      * Cerrar sesión del usuario y revocar su token actual.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\JsonResponse
+     * @param  \Illuminate\Http\Request  $request //Solicitud HTTP
+     * @return \Illuminate\Http\JsonResponse //Redirecion
      */
     public function logout(Request $request)
     {
-        Auth::guard('web')->logout(); // Cerrar sesión correctamente con el guard web
+        Auth::guard('web')->logout(); // Cerrar sesion con el guard web
 
-        $request->session()->invalidate(); // Invalidar la sesión
+        $request->session()->invalidate(); // Invalidar la sesion actual
         $request->session()->regenerateToken(); // Regenerar el token csrf
 
-        return redirect()->route('home'); // Redirigir a la página principal
+        return redirect()->route('home'); // Redirigir a la pagina inicial
     }
 }

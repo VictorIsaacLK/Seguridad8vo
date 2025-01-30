@@ -62,20 +62,21 @@ class User extends Authenticatable
     }
 
     /**
-     * 🚀 Generar un nuevo código de autenticación de dos factores.
+     * Generar un nuevo codigo 2FA y guardarlo
+     * @return string codigo 2FA en texto plano para envio
      */
     public function generateTwoFactorCode()
     {
-        // Generar el código 2FA de 6 dígitos
+        // Generar el codigo 2FA de 6 digitos
         $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-        // Guardar el código cifrado en la base de datos
+        // Guardar el codigo cifrado en la base de datos
         $this->forceFill([
             'two_factor_code' => Crypt::encryptString($code),
             'two_factor_expires_at' => now()->addMinutes(2)
         ])->save();
 
-        // Retornar el código en texto plano
+        // Retornar el codigo en texto plano
         return $code;
     }
 }

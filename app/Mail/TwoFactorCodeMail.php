@@ -16,7 +16,7 @@ class TwoFactorCodeMail extends Mailable
     public $code;
 
     /**
-     * Crear una nueva instancia de mensaje.
+     * Crear una nueva instancia de mensaje
      */
     public function __construct($code)
     {
@@ -24,7 +24,7 @@ class TwoFactorCodeMail extends Mailable
     }
 
     /**
-     * Definir el asunto del correo.
+     * Definir el asunto del correo
      */
     public function envelope()
     {
@@ -34,7 +34,7 @@ class TwoFactorCodeMail extends Mailable
     }
 
     /**
-     * Definir el contenido del mensaje.
+     * Definir el contenido del mensaje
      */
     public function content()
     {
