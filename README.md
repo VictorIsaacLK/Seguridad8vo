@@ -94,4 +94,7 @@ php artisan config:clear
 php artisan route:clear
 php artisan view:clear
 
+- **Entrar a mysql de xampp:**
+cd C:\xampp\mysql\bin
+mysql -u root -p
 

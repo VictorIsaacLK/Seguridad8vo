@@ -14,7 +14,7 @@ class ActivationController extends Controller
      *
      * @param \Illuminate\Http\Request $request La instancia de la solicitud entrante.
      * @param int $id El ID del usuario a activar.
-     * @return \Illuminate\Http\RedirectResponse Redirige a la ruta de inicio de sesión con un mensaje de éxito o de cuenta ya activada.
+     * @return \Illuminate\Http\RedirectResponse Redirige a la ruta de inicio de sesion con un mensaje de éxito o de cuenta ya activada.
      */
     public function activateAccount(Request $request)
     {
