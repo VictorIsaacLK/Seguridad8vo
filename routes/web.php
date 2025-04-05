@@ -48,7 +48,7 @@ Route::get('/activate-account/{id}', [ActivationController::class, 'activateAcco
 
 
 
-Route::get('/verify-code', [TwoFactorController::class, 'showVerifyForm'])->name('verify.code');
+Route::get('/verify-code', [TwoFactorController::class, 'showVerifyForm'])->name('verify.code')->middleware('signed');
 Route::post('/verify-code', [TwoFactorController::class, 'verifyCode'])->name('verify.code.submit');
 Route::post('/resend-code', [TwoFactorController::class, 'resendCode'])->name('resend.code');
 

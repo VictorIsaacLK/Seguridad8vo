@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Carbon\Carbon;
 use App\Notifications\ActivateAccount;
 use App\Models\User;
+use Illuminate\Support\Facades\URL;
 
 class UserController extends Controller
 {
@@ -238,7 +239,7 @@ class UserController extends Controller
         return response()->json([
             'status' => 'success',
             'message' => 'Se ha enviado un código a tu correo.',
-            'redirect' => route('verify.code')
+            'redirect' => URL::signedRoute('verify.code', [], now()->addMinutes(5)),
         ], 200);
     }
     /**

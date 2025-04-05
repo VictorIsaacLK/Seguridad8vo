@@ -204,7 +204,7 @@
                     text: 'Revisa tu correo para ingresar el código de verificación.',
                     confirmButtonText: 'OK'
                 }).then(() => {
-                    window.location.href = "{{ route('verify.code') }}";
+                    window.location.href = data.redirect;
                 });
 
             } catch (error) {

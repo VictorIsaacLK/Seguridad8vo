@@ -39,6 +39,7 @@
             background-color: #0056b3;
         }
     </style>
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </head>
 <body>
@@ -54,6 +55,9 @@
             @csrf
             <input type="text" name="two_factor_code" required maxlength="6">
             <button type="submit">Verificar</button>
+            <!-- reCAPTCHA -->
+            <div class="g-recaptcha" data-sitekey="{{ env('RECAPTCHA_SITE_KEY') }}"></div>
+            <span class="error" id="recaptchaError"></span>
         </form>
 
         <button class="resend-btn" id="resendCode">Reenviar Código</button>
@@ -66,38 +70,78 @@
     </div>
 
     <script>
-        document.getElementById("resendCode").addEventListener("click", function() {
+        document.getElementById('verifyForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            // Limpiar mensajes de error previos
+            document.querySelectorAll('.error').forEach(el => el.textContent = '');
+
+            // Mostrar alerta de carga
             Swal.fire({
-                title: "Reenviando código...",
-                text: "Por favor espera mientras generamos un nuevo código.",
+                title: 'Verificando código...',
+                text: 'Por favor espera mientras verificamos tu información.',
                 allowOutsideClick: false,
                 didOpen: () => {
                     Swal.showLoading();
                 }
             });
 
-            fetch("{{ route('resend.code') }}", {
-                method: "POST",
-                headers: {
-                    "X-CSRF-TOKEN": document.querySelector('input[name="_token"]').value,
-                    "Content-Type": "application/json"
+            // Deshabilitar el botón de verificación
+            let verifyButton = document.querySelector('button[type="submit"]');
+            verifyButton.disabled = true;
+
+            let formData = new FormData(this);
+            formData.append('g-recaptcha-response', grecaptcha.getResponse());
+
+            try {
+                let response = await fetch("{{ route('verify.code.submit') }}", {
+                    method: "POST",
+                    headers: {
+                        "X-CSRF-TOKEN": document.querySelector('input[name="_token"]').value
+                    },
+                    body: formData
+                });
+
+                let data = await response.json();
+
+                if (!response.ok) {
+                    Swal.close();
+                    verifyButton.disabled = false;
+                    if (data.errors.recaptcha) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'reCAPTCHA inválido',
+                            text: data.errors.recaptcha
+                        });
+                    } else if (data.errors.general) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: data.errors.general
+                        });
+                    }
+                    return;
                 }
-            })
-            .then(response => response.json())
-            .then(data => {
+
+                // Si el código es correcto, redirigir
                 Swal.fire({
-                    icon: data.status === "success" ? "success" : "error",
-                    title: data.status === "success" ? "Código reenviado" : "Error",
-                    text: data.message
+                    icon: 'success',
+                    title: 'Código verificado',
+                    text: 'Acceso concedido. Redirigiendo...',
+                    confirmButtonText: 'OK'
+                }).then(() => {
+                    window.location.href = "{{ route('home') }}";
                 });
-            })
-            .catch(error => {
+
+            } catch (error) {
+                console.error("Error en la solicitud:", error);
                 Swal.fire({
-                    icon: "error",
-                    title: "Error en el servidor",
-                    text: "Hubo un problema al reenviar el código. Inténtalo más tarde."
+                    icon: 'error',
+                    title: 'Error en el servidor',
+                    text: 'Hubo un problema, intenta nuevamente más tarde.'
                 });
-            });
+                verifyButton.disabled = false;
+            }
         });
     </script>
 </body>
