@@ -47,14 +47,16 @@
     <div class="container">
         @auth
             <h1>Bienvenido, {{ Auth::user()->name }}!</h1>
-            <h2>Servidor </h2>
+            <h2>Servidor: {{ env('APP_PROJECT') }}</h2>
+
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <button type="submit" class="btn btn-logout">Cerrar sesión</button>
             </form>
         @else
             <h1>Bienvenido a la aplicación</h1>
-            <h2>Servidor </h2>
+            <h2>Servidor: {{ env('APP_PROJECT') }}</h2>
+
             <a href="{{ route('login') }}" class="btn btn-login">Iniciar sesión</a>
         @endauth
     </div>
