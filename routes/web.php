@@ -119,3 +119,8 @@ Route::get('/set-session', function () {
 Route::get('/get-session', function () {
     return session('user_id', 'No session found!');
 });
+
+Route::get('/set-manual-session', function () {
+    \Illuminate\Support\Facades\Redis::set('test', 'hello');  // Intenta escribir directamente en Redis
+    return 'Redis Test Completed!';
+});
