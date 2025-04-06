@@ -112,7 +112,7 @@ Route::get('/test-auth', function () {
 
 
 Route::get('/set-session', function () {
-    session(['user_id' => 123]);
+    session(['user_id' => 2]);
     return 'Session set!';
 });
 
