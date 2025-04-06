@@ -1,7 +1,7 @@
 @if (Auth::check())
-    <script>
-        window.location.href = "{{ route('/') }}";
-    </script>
+<script>
+    window.location.href = "{{ route('/') }}";
+</script>
 @endif
 <!DOCTYPE html>
 <html lang="es">
@@ -170,9 +170,6 @@
             try {
                 let response = await fetch("{{ route('login.submit') }}", {
                     method: "POST",
-                    headers: {
-                        "X-CSRF-TOKEN": document.querySelector('input[name="_token"]').value
-                    },
                     body: formData
                 });
 
