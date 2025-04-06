@@ -134,6 +134,7 @@ class UserController extends Controller
      */
     public function login(Request $request)
     {
+        Log::info('Se ha llamado al método login');
         // Definir llaves para limitar por IP y por email
         $keyIp = 'login-ip:' . $request->ip();
         $keyEmail = 'login-email:' . $request->email;

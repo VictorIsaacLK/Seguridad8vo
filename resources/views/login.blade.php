@@ -145,6 +145,7 @@
     <script>
         document.getElementById('loginForm').addEventListener('submit', async function(event) {
             event.preventDefault();
+            console.log(document.querySelector('input[name="_token"]'));
 
             // Limpiar mensajes de error previos
             document.querySelectorAll('.error').forEach(el => el.textContent = '');
