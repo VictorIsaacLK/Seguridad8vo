@@ -145,9 +145,14 @@
     <script>
         document.getElementById('loginForm').addEventListener('submit', async function(event) {
             event.preventDefault();
-            console.log(document.querySelector('input[name="_token"]'));
 
-            // Limpiar mensajes de error previos
+            console.log("➡️ Evento submit disparado");
+
+            let tokenInput = document.querySelector('input[name="_token"]');
+            console.log("🔑 Token CSRF encontrado en el DOM:", tokenInput);
+            console.log("🔑 Valor del token:", tokenInput?.value);
+
+            // Limpiar errores anteriores
             document.querySelectorAll('.error').forEach(el => el.textContent = '');
 
             // Mostrar alerta de carga
@@ -167,18 +172,44 @@
             let formData = new FormData(this);
             formData.append('g-recaptcha-response', grecaptcha.getResponse());
 
+            console.log("📦 FormData construido:");
+            for (let pair of formData.entries()) {
+                console.log(`${pair[0]}: ${pair[1]}`);
+            }
+
+            // DEBUG de ruta
+            const endpoint = "{{ route('login.submit') }}";
+            console.log("🌐 URL a donde se enviará el POST:", endpoint);
+
             try {
-                let response = await fetch("{{ route('login.submit') }}", {
+                let response = await fetch(endpoint, {
                     method: "POST",
+                    headers: {
+                        'Accept': 'application/json', // Asegura que Laravel devuelva JSON
+                        'X-CSRF-TOKEN': tokenInput?.value
+                    },
                     body: formData
                 });
 
-                let data = await response.json();
+                console.log("📨 Respuesta recibida del servidor:");
+                console.log("✅ Status:", response.status);
+                console.log("✅ OK:", response.ok);
+
+                let textData = await response.text(); // primero obtenlo como texto por si no es JSON válido
+                console.log("📄 Cuerpo de la respuesta:", textData);
+
+                let data;
+                try {
+                    data = JSON.parse(textData);
+                } catch (jsonError) {
+                    console.error("❌ No se pudo parsear el JSON:", jsonError);
+                    throw new Error("Respuesta no es JSON válido");
+                }
 
                 if (!response.ok) {
                     Swal.close();
                     loginButton.disabled = false;
-                    if (data.errors.general) {
+                    if (data.errors?.general) {
                         if (response.status === 429) {
                             Swal.fire({
                                 icon: 'error',
@@ -192,11 +223,17 @@
                                 text: data.errors.general
                             });
                         }
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: 'Error desconocido.'
+                        });
                     }
                     return;
                 }
 
-                // Si el login es correcto, mostrar alerta de éxito
+                // Si todo va bien
                 Swal.fire({
                     icon: 'success',
                     title: 'Código enviado',
@@ -207,7 +244,7 @@
                 });
 
             } catch (error) {
-                console.error("Error en la solicitud:", error);
+                console.error("❌ Error en la solicitud:", error);
                 Swal.fire({
                     icon: 'error',
                     title: 'Error en el servidor',
