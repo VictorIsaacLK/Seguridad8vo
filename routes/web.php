@@ -95,3 +95,27 @@ Route::get('/session-check', function (Request $request) {
 Route::get('/test-auth', function () {
     return Auth::check() ? 'Usuario autenticado: ' . Auth::user()->name : 'No hay usuario autenticado';
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Route::get('/set-session', function () {
+    session(['user_id' => 123]);
+    return 'Session set!';
+});
+
+Route::get('/get-session', function () {
+    return session('user_id', 'No session found!');
+});
