@@ -139,6 +139,8 @@ class UserController extends Controller
         $keyEmail = 'login-email:' . $request->email;
 
         // Si se alcanzó el limite, devolver error
+        Log::info("Verificando intentos fallidos para IP: {$request->ip()} y correo: {$request->email}");
+
         if (RateLimiter::tooManyAttempts($keyIp, 5)) {
             Log::warning("Intentos fallidos excesivos desde IP: {$request->ip()}");
             return response()->json([
@@ -146,6 +148,7 @@ class UserController extends Controller
                 'errors' => ['general' => 'Demasiados intentos. Intenta de nuevo en ' . RateLimiter::availableIn($keyIp) . ' segundos.']
             ], 429);
         }
+
         if (RateLimiter::tooManyAttempts($keyEmail, 5)) {
             Log::warning("Intentos fallidos excesivos con el correo: {$request->email}");
             return response()->json([
@@ -155,6 +158,8 @@ class UserController extends Controller
         }
 
         // Validacion de los datos
+        Log::info("Validando los datos de inicio de sesión");
+
         $validator = Validator::make($request->all(), [
             'email' => 'required|email|max:50',
             'password' => 'required|string|min:8|max:14|regex:/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/',
@@ -164,7 +169,7 @@ class UserController extends Controller
         ]);
 
         if ($validator->fails()) {
-            Log::error("Error de validacion en login: ", $validator->errors()->toArray());
+            Log::error("Error de validación en login: ", $validator->errors()->toArray());
             return response()->json([
                 'status' => 'error',
                 'errors' => ['general' => 'Los datos ingresados son incorrectos.']
@@ -172,6 +177,8 @@ class UserController extends Controller
         }
 
         // Verificar recaptcha con Google
+        Log::info("Verificando reCAPTCHA");
+
         $recaptchaResponse = Http::asForm()->post('https://www.google.com/recaptcha/api/siteverify', [
             'secret' => env('RECAPTCHA_SECRET_KEY'),
             'response' => $request->input('g-recaptcha-response')
@@ -188,16 +195,19 @@ class UserController extends Controller
         }
 
         // Buscar usuario
+        Log::info("Buscando usuario con correo: {$request->email}");
+
         $user = User::where('email', $request->email)->first();
 
         // Credenciales verificacion
+        Log::info("Verificando credenciales del usuario");
+
         if (!$user || !Hash::check($request->password, $user->password)) {
             // Aumentar contador de intentos fallidos
             RateLimiter::hit($keyIp, 60);
             RateLimiter::hit($keyEmail, 60);
 
             Log::error("Intento de inicio de sesión fallido con el correo: {$request->email}");
-
 
             return response()->json([
                 'status' => 'error',
@@ -206,6 +216,8 @@ class UserController extends Controller
         }
 
         // Verificar si el usuario esta activo (status == 1)
+        Log::info("Verificando estado de la cuenta del usuario");
+
         if ($user->status !== 1) {
             Log::warning("Intento de inicio de sesión con cuenta inactiva: {$request->email}");
             return response()->json([
@@ -215,8 +227,9 @@ class UserController extends Controller
         }
 
         // Generar codigo 2FA y obtenerlo en texto plano (no codificado)
+        Log::info("Generando código 2FA para usuario: {$user->email}");
+
         $twoFactorCode = $user->generateTwoFactorCode();
-        Log::info("codigo 2FA generado para usuario: {$user->email}");
 
         // Guardar el ID en sesión (cifrado)
         session(['two_factor_user_id' => Crypt::encryptString($user->id)]);
@@ -225,7 +238,9 @@ class UserController extends Controller
         RateLimiter::clear($keyIp);
         RateLimiter::clear($keyEmail);
 
-        // Enviar codigo en segundo plano
+        // Enviar código en segundo plano
+        Log::info("Enviando código 2FA al correo: {$user->email}");
+
         dispatch(function () use ($user, $twoFactorCode) {
             try {
                 Mail::to($user->email)->send(new TwoFactorCodeMail($twoFactorCode));
@@ -236,6 +251,8 @@ class UserController extends Controller
         });
 
         // Responder con éxito y redireccionar al siguiente paso
+        Log::info("Inicio de sesión exitoso. Redirigiendo al usuario.");
+
         return response()->json([
             'status' => 'success',
             'message' => 'Se ha enviado un código a tu correo.',

@@ -116,6 +116,7 @@
 <body>
     <div class="container">
         <h1>Iniciar Sesión</h1>
+        <h2>Servidor 1</h2>
 
         <form id="loginForm">
             @csrf
