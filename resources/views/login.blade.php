@@ -188,7 +188,8 @@
                         'Accept': 'application/json', // Asegura que Laravel devuelva JSON
                         'X-CSRF-TOKEN': tokenInput?.value
                     },
-                    body: formData
+                    body: formData,
+                    credentials: 'include'
                 });
 
                 console.log("📨 Respuesta recibida del servidor:");
